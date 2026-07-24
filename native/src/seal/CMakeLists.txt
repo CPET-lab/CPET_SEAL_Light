@@ -26,6 +26,7 @@ set(SEAL_SOURCE_FILES ${SEAL_SOURCE_FILES}
 install(
     FILES
         ${CMAKE_CURRENT_LIST_DIR}/batchencoder.h
+        ${CMAKE_CURRENT_LIST_DIR}/bfvnoiseflooding.h
         ${CMAKE_CURRENT_LIST_DIR}/ciphertext.h
         ${CMAKE_CURRENT_LIST_DIR}/ckks.h
         ${CMAKE_CURRENT_LIST_DIR}/coeffencoder.h

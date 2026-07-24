@@ -41,6 +41,7 @@ namespace seal
             size_t hwt);
 
         /**
+        Modified by Dice15.
         Generate a polynomial from a normal distribution and store in RNS representation.
 
         @param[in] prng A uniform random generator
@@ -49,7 +50,7 @@ namespace seal
         */
         void sample_poly_normal(
             std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms,
-            std::uint64_t *destination);
+            std::uint64_t *destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
 
         /**
         Generate a polynomial from a centered binomial distribution and store in RNS representation.
@@ -60,7 +61,7 @@ namespace seal
         */
         void sample_poly_cbd(
             std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms,
-            std::uint64_t *destination);
+            std::uint64_t *destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
 
         /**
         Generate a uniformly random polynomial and store in RNS representation.
@@ -98,6 +99,7 @@ namespace seal
             std::uint64_t *destination);
 
         /**
+        Modified by Dice15.
         Create an encryption of zero with a public key and store in a ciphertext.
 
         @param[in] public_key The public key used for encryption
@@ -108,9 +110,10 @@ namespace seal
         */
         void encrypt_zero_asymmetric(
             const PublicKey &public_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            Ciphertext &destination);
+            Ciphertext &destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
 
         /**
+        Modified by Dice15.
         Create an encryption of zero with a secret key and store in a ciphertext.
 
         @param[out] destination The output ciphertext - an encryption of zero
@@ -123,6 +126,6 @@ namespace seal
         */
         void encrypt_zero_symmetric(
             const SecretKey &secret_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            bool save_seed, Ciphertext &destination);
+            bool save_seed, Ciphertext &destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
     } // namespace util
 } // namespace seal

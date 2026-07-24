@@ -112,6 +112,7 @@ namespace seal
         }
 
         /**
+        Modified by Dice15.
         Encrypts a plaintext with the public key and stores the result in
         destination.
 
@@ -132,12 +133,15 @@ namespace seal
         @throws std::invalid_argument if pool is uninitialized
         */
         inline void encrypt(
-            const Plaintext &plain, Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
+            const Plaintext &plain, Ciphertext &destination, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
-            encrypt_internal(plain, true, false, destination, pool);
+            encrypt_internal(plain, true, false, destination, noise_standard_deviation, pool);
         }
 
         /**
+        Modified by Dice15.
         Encrypts a plaintext with the public key and returns the ciphertext as
         a serializable object.
 
@@ -156,14 +160,17 @@ namespace seal
         @throws std::invalid_argument if pool is uninitialized
         */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt(
-            const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
+            const Plaintext &plain, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext destination;
-            encrypt_internal(plain, true, true, destination, pool);
+            encrypt_internal(plain, true, true, destination, noise_standard_deviation, pool);
             return destination;
         }
 
         /**
+        Modified by Dice15.
         Encrypts a zero plaintext with the public key and stores the result in
         destination.
 
@@ -178,12 +185,15 @@ namespace seal
         @throws std::logic_error if a public key is not set
         @throws std::invalid_argument if pool is uninitialized
         */
-        inline void encrypt_zero(Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
+        inline void encrypt_zero(Ciphertext &destination, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
-            encrypt_zero(context_.first_parms_id(), destination, pool);
+            encrypt_zero(context_.first_parms_id(), destination, noise_standard_deviation, pool);
         }
 
         /**
+        Modified by Dice15.
         Encrypts a zero plaintext with the public key and returns the ciphertext
         as a serializable object.
 
@@ -199,14 +209,17 @@ namespace seal
         @throws std::invalid_argument if pool is uninitialized
         */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero(
-            parms_id_type parms_id, MemoryPoolHandle pool = MemoryManager::GetPool()) const
+            parms_id_type parms_id, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext destination;
-            encrypt_zero_internal(parms_id, true, true, destination, pool);
+            encrypt_zero_internal(parms_id, true, true, destination, noise_standard_deviation, pool);
             return destination;
         }
 
         /**
+        Modified by Dice15.
         Encrypts a zero plaintext with the public key and stores the result in
         destination.
 
@@ -224,12 +237,15 @@ namespace seal
         @throws std::invalid_argument if pool is uninitialized
         */
         inline void encrypt_zero(
-            parms_id_type parms_id, Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
+            parms_id_type parms_id, Ciphertext &destination, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation,
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
-            encrypt_zero_internal(parms_id, true, false, destination, pool);
+            encrypt_zero_internal(parms_id, true, false, destination, noise_standard_deviation, pool);
         }
 
         /**
+        Modified by Dice15.
         Encrypts a zero plaintext with the public key and returns the ciphertext
         as a serializable object.
 
@@ -243,12 +259,14 @@ namespace seal
         @throws std::invalid_argument if pool is uninitialized
         */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero(
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
-            return encrypt_zero(context_.first_parms_id(), pool);
+            return encrypt_zero(context_.first_parms_id(), noise_standard_deviation, pool);
         }
 
         /**
+        Modified by Dice15.
         Encrypts a plaintext with the secret key and stores the result in
         destination.
 
@@ -269,12 +287,15 @@ namespace seal
         @throws std::invalid_argument if pool is uninitialized
         */
         inline void encrypt_symmetric(
-            const Plaintext &plain, Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
+            const Plaintext &plain, Ciphertext &destination, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
-            encrypt_internal(plain, false, false, destination, pool);
+            encrypt_internal(plain, false, false, destination, noise_standard_deviation, pool);
         }
 
         /**
+        Modified by Dice15.
         Encrypts a plaintext with the secret key and returns the ciphertext as
         a serializable object.
 
@@ -298,107 +319,120 @@ namespace seal
         @throws std::invalid_argument if pool is uninitialized
         */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_symmetric(
-            const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
-        {
-            Ciphertext destination;
-            encrypt_internal(plain, false, true, destination, pool);
-            return destination;
-        }
-
-        /**
-        Encrypts a zero plaintext with the secret key and stores the result in
-        destination.
-
-        The encryption parameters for the resulting ciphertext correspond to the
-        given parms_id. Dynamic memory allocations in the process are allocated
-        from the memory pool pointed to by the given MemoryPoolHandle.
-
-        @param[in] parms_id The parms_id for the resulting ciphertext
-        @param[out] destination The ciphertext to overwrite with the encrypted
-        plaintext
-        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
-        @throws std::logic_error if a secret key is not set
-        @throws std::invalid_argument if parms_id is not valid for the encryption
-        parameters
-        @throws std::invalid_argument if pool is uninitialized
-        */
-        inline void encrypt_zero_symmetric(
-            parms_id_type parms_id, Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
-        {
-            encrypt_zero_internal(parms_id, false, false, destination, pool);
-        }
-
-        /**
-        Encrypts a zero plaintext with the secret key and returns the ciphertext
-        as a serializable object.
-
-        Half of the ciphertext data is pseudo-randomly generated from a seed to
-        reduce the object size. The resulting serializable object cannot be used
-        directly and is meant to be serialized for the size reduction to have an
-        impact.
-
-        The encryption parameters for the resulting ciphertext correspond to the
-        given parms_id. Dynamic memory allocations in the process are allocated
-        from the memory pool pointed to by the given MemoryPoolHandle.
-
-        @param[in] parms_id The parms_id for the resulting ciphertext
-        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
-        @throws std::logic_error if a secret key is not set
-        @throws std::invalid_argument if parms_id is not valid for the encryption
-        parameters
-        @throws std::invalid_argument if pool is uninitialized
-        */
-        SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero_symmetric(
-            parms_id_type parms_id, MemoryPoolHandle pool = MemoryManager::GetPool()) const
-        {
-            Ciphertext destination;
-            encrypt_zero_internal(parms_id, false, true, destination, pool);
-            return destination;
-        }
-
-        /**
-        Encrypts a zero plaintext with the secret key and stores the result in
-        destination.
-
-        The encryption parameters for the resulting ciphertext correspond to the
-        highest (data) level in the modulus switching chain. Dynamic memory
-        allocations in the process are allocated from the memory pool pointed to
-        by the given MemoryPoolHandle.
-
-        @param[out] destination The ciphertext to overwrite with the encrypted
-        plaintext
-        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
-        @throws std::logic_error if a secret key is not set
-        @throws std::invalid_argument if pool is uninitialized
-        */
-        inline void encrypt_zero_symmetric(
-            Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
-        {
-            encrypt_zero_symmetric(context_.first_parms_id(), destination, pool);
-        }
-
-        /**
-        Encrypts a zero plaintext with the secret key and returns the ciphertext
-        as a serializable object.
-
-        Half of the ciphertext data is pseudo-randomly generated from a seed to
-        reduce the object size. The resulting serializable object cannot be used
-        directly and is meant to be serialized for the size reduction to have an
-        impact.
-
-        The encryption parameters for the resulting ciphertext correspond to the
-        highest (data) level in the modulus switching chain. Dynamic memory
-        allocations in the process are allocated from the memory pool pointed to
-        by the given MemoryPoolHandle.
-
-        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
-        @throws std::logic_error if a secret key is not set
-        @throws std::invalid_argument if pool is uninitialized
-        */
-        SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero_symmetric(
+            const Plaintext &plain, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
-            return encrypt_zero_symmetric(context_.first_parms_id(), pool);
+            Ciphertext destination;
+            encrypt_internal(plain, false, true, destination, noise_standard_deviation, pool);
+            return destination;
+        }
+
+        /**
+        Modified by Dice15.
+        Encrypts a zero plaintext with the secret key and stores the result in
+        destination.
+
+        The encryption parameters for the resulting ciphertext correspond to the
+        given parms_id. Dynamic memory allocations in the process are allocated
+        from the memory pool pointed to by the given MemoryPoolHandle.
+
+        @param[in] parms_id The parms_id for the resulting ciphertext
+        @param[out] destination The ciphertext to overwrite with the encrypted
+        plaintext
+        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
+        @throws std::logic_error if a secret key is not set
+        @throws std::invalid_argument if parms_id is not valid for the encryption
+        parameters
+        @throws std::invalid_argument if pool is uninitialized
+        */
+        inline void encrypt_zero_symmetric(
+            parms_id_type parms_id, Ciphertext &destination, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
+        {
+            encrypt_zero_internal(parms_id, false, false, destination, noise_standard_deviation, pool);
+        }
+
+        /**
+        Modified by Dice15.
+        Encrypts a zero plaintext with the secret key and returns the ciphertext
+        as a serializable object.
+
+        Half of the ciphertext data is pseudo-randomly generated from a seed to
+        reduce the object size. The resulting serializable object cannot be used
+        directly and is meant to be serialized for the size reduction to have an
+        impact.
+
+        The encryption parameters for the resulting ciphertext correspond to the
+        given parms_id. Dynamic memory allocations in the process are allocated
+        from the memory pool pointed to by the given MemoryPoolHandle.
+
+        @param[in] parms_id The parms_id for the resulting ciphertext
+        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
+        @throws std::logic_error if a secret key is not set
+        @throws std::invalid_argument if parms_id is not valid for the encryption
+        parameters
+        @throws std::invalid_argument if pool is uninitialized
+        */
+        SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero_symmetric(
+            parms_id_type parms_id, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
+        {
+            Ciphertext destination;
+            encrypt_zero_internal(parms_id, false, true, destination, noise_standard_deviation, pool);
+            return destination;
+        }
+
+        /**
+        Modified by Dice15.
+        Encrypts a zero plaintext with the secret key and stores the result in
+        destination.
+
+        The encryption parameters for the resulting ciphertext correspond to the
+        highest (data) level in the modulus switching chain. Dynamic memory
+        allocations in the process are allocated from the memory pool pointed to
+        by the given MemoryPoolHandle.
+
+        @param[out] destination The ciphertext to overwrite with the encrypted
+        plaintext
+        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
+        @throws std::logic_error if a secret key is not set
+        @throws std::invalid_argument if pool is uninitialized
+        */
+        inline void encrypt_zero_symmetric(
+            Ciphertext &destination, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation, 
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
+        {
+            encrypt_zero_symmetric(context_.first_parms_id(), destination, noise_standard_deviation, pool);
+        }
+
+        /**
+        Modified by Dice15.
+        Encrypts a zero plaintext with the secret key and returns the ciphertext
+        as a serializable object.
+
+        Half of the ciphertext data is pseudo-randomly generated from a seed to
+        reduce the object size. The resulting serializable object cannot be used
+        directly and is meant to be serialized for the size reduction to have an
+        impact.
+
+        The encryption parameters for the resulting ciphertext correspond to the
+        highest (data) level in the modulus switching chain. Dynamic memory
+        allocations in the process are allocated from the memory pool pointed to
+        by the given MemoryPoolHandle.
+
+        @param[in] pool The MemoryPoolHandle pointing to a valid memory pool
+        @throws std::logic_error if a secret key is not set
+        @throws std::invalid_argument if pool is uninitialized
+        */
+        SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero_symmetric(
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation,
+            MemoryPoolHandle pool = MemoryManager::GetPool()) const
+        {
+            return encrypt_zero_symmetric(context_.first_parms_id(), noise_standard_deviation, pool);
         }
 
         /**
@@ -415,12 +449,16 @@ namespace seal
 
         Encryptor &operator=(Encryptor &&assign) = delete;
 
+        // Modified by Dice15.
         void encrypt_zero_internal(
             parms_id_type parms_id, bool is_asymmetric, bool save_seed, Ciphertext &destination,
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const;
 
+        // Modified by Dice15.
         void encrypt_internal(
-            const Plaintext &plain, bool is_asymmetric, bool save_seed, Ciphertext &destination,
+            const Plaintext &plain, bool is_asymmetric, bool save_seed, Ciphertext &destination, 
+            double noise_standard_deviation = util::global_variables::noise_standard_deviation,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const;
 
         SEALContext context_;

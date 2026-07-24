@@ -36,7 +36,7 @@ namespace seal
                     [&](auto J) { *get<0>(J) = rand + (flag & get<1>(J).value()) - 1; });
             });
         }
-       
+
         // Added by Dice15
         void sample_poly_ternary_hwt(
             shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination,
@@ -71,21 +71,23 @@ namespace seal
         }
 
         void sample_poly_normal(
-            shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination)
+            shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination,
+            double noise_standard_deviation)
         {
             auto coeff_modulus = parms.coeff_modulus();
             size_t coeff_modulus_size = coeff_modulus.size();
             size_t coeff_count = parms.poly_modulus_degree();
+            double noise_max_deviation =
+                noise_standard_deviation * global_variables::noise_distribution_width_multiplier;
 
-            if (are_close(global_variables::noise_max_deviation, 0.0))
+            if (are_close(noise_max_deviation, 0.0))
             {
                 set_zero_poly(coeff_count, coeff_modulus_size, destination);
                 return;
             }
 
             RandomToStandardAdapter engine(prng);
-            ClippedNormalDistribution dist(
-                0, global_variables::noise_standard_deviation, global_variables::noise_max_deviation);
+            ClippedNormalDistribution dist(0, noise_standard_deviation, noise_max_deviation);
 
             SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
                 int64_t noise = static_cast<int64_t>(dist(engine));
@@ -97,7 +99,8 @@ namespace seal
         }
 
         void sample_poly_cbd(
-            shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination)
+            shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination,
+            double noise_standard_deviation)
         {
             auto coeff_modulus = parms.coeff_modulus();
             size_t coeff_modulus_size = coeff_modulus.size();
@@ -109,10 +112,11 @@ namespace seal
                 return;
             }
 
-            if (!are_close(global_variables::noise_standard_deviation, 3.2))
+            if (!are_close(noise_standard_deviation, 3.2))
             {
-                throw logic_error("centered binomial distribution only supports standard deviation 3.2; use rounded "
-                                  "Gaussian instead");
+                throw logic_error(
+                    "centered binomial distribution only supports standard deviation 3.2; use rounded "
+                    "Gaussian instead");
             }
 
             auto cbd = [&]() {
@@ -221,7 +225,7 @@ namespace seal
 
         void encrypt_zero_asymmetric(
             const PublicKey &public_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            Ciphertext &destination)
+            Ciphertext &destination, double noise_standard_deviation)
         {
 #ifdef SEAL_DEBUG
             if (!is_valid_for(public_key, context))
@@ -277,11 +281,20 @@ namespace seal
                 }
             }
 
+            // Modified by Dice15.
             // Generate e_j <-- chi
             // c[j] = public_key[j] * u + e[j] in BFV/CKKS, = public_key[j] * u + p * e[j] in BGV,
             for (size_t j = 0; j < encrypted_size; j++)
             {
-                SEAL_NOISE_SAMPLER(prng, parms, u.get());
+                if (are_close(noise_standard_deviation, 3.2))
+                {
+                    sample_poly_cbd(prng, parms, u.get(), noise_standard_deviation);
+                }
+                else
+                {
+                    sample_poly_normal(prng, parms, u.get(), noise_standard_deviation);
+                }
+                // SEAL_NOISE_SAMPLER(prng, parms, u.get(), noise_standard_deviation);
                 RNSIter gaussian_iter(u.get(), coeff_count);
 
                 // In BGV, p * e is used
@@ -308,7 +321,7 @@ namespace seal
 
         void encrypt_zero_symmetric(
             const SecretKey &secret_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            bool save_seed, Ciphertext &destination)
+            bool save_seed, Ciphertext &destination, double noise_standard_deviation)
         {
 #ifdef SEAL_DEBUG
             if (!is_valid_for(secret_key, context))
@@ -382,9 +395,18 @@ namespace seal
                 }
             }
 
+            // Modified by Dice15.
             // Sample e <-- chi
             auto noise(allocate_poly(coeff_count, coeff_modulus_size, pool));
-            SEAL_NOISE_SAMPLER(bootstrap_prng, parms, noise.get());
+            if (are_close(noise_standard_deviation, 3.2))
+            {
+                sample_poly_cbd(bootstrap_prng, parms, noise.get(), noise_standard_deviation);
+            }
+            else
+            {
+                sample_poly_normal(bootstrap_prng, parms, noise.get(), noise_standard_deviation);
+            }
+            // SEAL_NOISE_SAMPLER(bootstrap_prng, parms, noise.get(), noise_standard_deviation);
 
             // Calculate -(as+ e) (mod q) and store in c[0] in BFV/CKKS
             // Calculate -(as+pe) (mod q) and store in c[0] in BGV
