@@ -207,7 +207,7 @@ namespace seal
             throw invalid_argument("pool is uninitialized");
         }
 
-        auto& context_data = *context_.first_context_data();
+        // auto& context_data = *context_.first_context_data();
 
         // Set destination size
         destination.resize(slots_);
@@ -288,7 +288,7 @@ namespace seal
             throw invalid_argument("pool is uninitialized");
         }
 
-        auto& context_data = *context_.first_context_data();
+        // auto& context_data = *context_.first_context_data();
 
         if (unsigned_gt(destination.size(), numeric_limits<int>::max()) || unsigned_neq(destination.size(), slots_))
         {

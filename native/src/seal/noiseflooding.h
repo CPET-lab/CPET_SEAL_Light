@@ -9,7 +9,7 @@ using namespace seal::util;
 
 namespace seal
 {
-    void make_encryption_of_zero(
+    inline void make_encryption_of_zero(
         const SEALContext& context, const CoeffEncoder& encoder, const Encryptor& encryptor, const Evaluator& evaluator, 
         int log_noise_bound, int stat_sec, Ciphertext& destination)
     {
@@ -95,7 +95,7 @@ namespace seal
     }
 
 
-    void noise_flooding_inplace(const Evaluator& evaluator, const Ciphertext& encrypted_zero, Ciphertext& encrypted)
+    inline void noise_flooding_inplace(const Evaluator& evaluator, const Ciphertext& encrypted_zero, Ciphertext& encrypted)
     {
         // Verify parameters.
         if (!encrypted.is_ntt_form() || !encrypted_zero.is_ntt_form())

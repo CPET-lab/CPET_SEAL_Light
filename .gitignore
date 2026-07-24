@@ -2,6 +2,10 @@
 #### SEAL Specific ####
 #######################
 
+# Personal scratch/test folder (keep the CMakeLists.txt, ignore everything else)
+native/experiments/*
+!native/experiments/CMakeLists.txt
+
 # Configuration
 !cmake/*.cmake.in
 !cmake/*.cmake
