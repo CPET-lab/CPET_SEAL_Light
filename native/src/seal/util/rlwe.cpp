@@ -225,7 +225,7 @@ namespace seal
 
         void encrypt_zero_asymmetric(
             const PublicKey &public_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            Ciphertext &destination, double noise_standard_deviation)
+            Ciphertext &destination, vector<double> noise_standard_deviations)
         {
 #ifdef SEAL_DEBUG
             if (!is_valid_for(public_key, context))
@@ -233,6 +233,13 @@ namespace seal
                 throw invalid_argument("public key is not valid for the encryption parameters");
             }
 #endif
+            // Verify parameters.
+            if (noise_standard_deviations.size() != public_key.data().size())
+            {
+                throw invalid_argument(
+                    "noise_standard_deviations size must match the size of the public key (typically 2)");
+            }
+
             // We use a fresh memory pool with `clear_on_destruction' enabled
             MemoryPoolHandle pool = MemoryManager::GetPool(mm_prof_opt::mm_force_new, true);
 
@@ -259,9 +266,23 @@ namespace seal
             // Create a PRNG; u and the noise/error share the same PRNG
             auto prng = parms.random_generator()->create();
 
-            // Generate u <-- R_3
+            // Modified by Dice15.
+            // Generate u <-- R_3 for noise flooding.
+            // According to Definition 4, the zero encryption term is: e'_2 * pk + (e'_0, e'_1).
+            // - e'_0 is sampled with standard deviation \tau_0 (noise_standard_deviations[0]).
+            // - e'_1 and e'_2 are sampled with standard deviation \tau_1 (noise_standard_deviations[1]).
+            // Therefore, instead of standard u <-- R_3 (ternary), we sample 'u' (acting as e'_2)
+            // using noise_standard_deviations[1] (which represents \tau_1).
             auto u(allocate_poly(coeff_count, coeff_modulus_size, pool));
-            sample_poly_ternary(prng, parms, u.get());
+            if (are_close(noise_standard_deviations[1], 3.2))
+            {
+                sample_poly_cbd(prng, parms, u.get(), noise_standard_deviations[1]);
+            }
+            else
+            {
+                sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[1]);
+            }
+            // sample_poly_ternary(prng, parms, u.get());
 
             // c[j] = u * public_key[j]
             for (size_t i = 0; i < coeff_modulus_size; i++)
@@ -286,13 +307,13 @@ namespace seal
             // c[j] = public_key[j] * u + e[j] in BFV/CKKS, = public_key[j] * u + p * e[j] in BGV,
             for (size_t j = 0; j < encrypted_size; j++)
             {
-                if (are_close(noise_standard_deviation, 3.2))
+                if (are_close(noise_standard_deviations[j], 3.2))
                 {
-                    sample_poly_cbd(prng, parms, u.get(), noise_standard_deviation);
+                    sample_poly_cbd(prng, parms, u.get(), noise_standard_deviations[j]);
                 }
                 else
                 {
-                    sample_poly_normal(prng, parms, u.get(), noise_standard_deviation);
+                    sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[j]);
                 }
                 // SEAL_NOISE_SAMPLER(prng, parms, u.get(), noise_standard_deviation);
                 RNSIter gaussian_iter(u.get(), coeff_count);
@@ -321,7 +342,7 @@ namespace seal
 
         void encrypt_zero_symmetric(
             const SecretKey &secret_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            bool save_seed, Ciphertext &destination, double noise_standard_deviation)
+            bool save_seed, Ciphertext &destination, vector<double> noise_standard_deviations)
         {
 #ifdef SEAL_DEBUG
             if (!is_valid_for(secret_key, context))
@@ -329,6 +350,12 @@ namespace seal
                 throw invalid_argument("secret key is not valid for the encryption parameters");
             }
 #endif
+            // Verify parameters.
+            if (noise_standard_deviations.size() != 1)
+            {
+                throw invalid_argument("noise_standard_deviations size must be exactly 1 for symmetric encryption");
+            }
+
             // We use a fresh memory pool with `clear_on_destruction' enabled.
             MemoryPoolHandle pool = MemoryManager::GetPool(mm_prof_opt::mm_force_new, true);
 
@@ -398,13 +425,13 @@ namespace seal
             // Modified by Dice15.
             // Sample e <-- chi
             auto noise(allocate_poly(coeff_count, coeff_modulus_size, pool));
-            if (are_close(noise_standard_deviation, 3.2))
+            if (are_close(noise_standard_deviations[0], 3.2))
             {
-                sample_poly_cbd(bootstrap_prng, parms, noise.get(), noise_standard_deviation);
+                sample_poly_cbd(bootstrap_prng, parms, noise.get(), noise_standard_deviations[0]);
             }
             else
             {
-                sample_poly_normal(bootstrap_prng, parms, noise.get(), noise_standard_deviation);
+                sample_poly_normal(bootstrap_prng, parms, noise.get(), noise_standard_deviations[0]);
             }
             // SEAL_NOISE_SAMPLER(bootstrap_prng, parms, noise.get(), noise_standard_deviation);
 

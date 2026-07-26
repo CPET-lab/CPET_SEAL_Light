@@ -87,8 +87,8 @@ namespace seal
 
     // Modified by Dice15.
     void Encryptor::encrypt_zero_internal(
-        parms_id_type parms_id, bool is_asymmetric, bool save_seed, Ciphertext &destination, 
-        double noise_standard_deviation, MemoryPoolHandle pool) const
+        parms_id_type parms_id, bool is_asymmetric, bool save_seed, Ciphertext &destination,
+        vector<double> noise_standard_deviations, MemoryPoolHandle pool) const
     {
         // Verify parameters.
         if (!pool)
@@ -133,7 +133,8 @@ namespace seal
 
                 // Zero encryption without modulus switching
                 Ciphertext temp(pool);
-                util::encrypt_zero_asymmetric(public_key_, context_, prev_parms_id, is_ntt_form, temp, noise_standard_deviation);
+                util::encrypt_zero_asymmetric(
+                    public_key_, context_, prev_parms_id, is_ntt_form, temp, noise_standard_deviations);
 
                 // Modulus switching
                 SEAL_ITERATE(iter(temp, destination), temp.size(), [&](auto I) {
@@ -164,20 +165,22 @@ namespace seal
             else
             {
                 // Does not require modulus switching
-                util::encrypt_zero_asymmetric(public_key_, context_, parms_id, is_ntt_form, destination, noise_standard_deviation);
+                util::encrypt_zero_asymmetric(
+                    public_key_, context_, parms_id, is_ntt_form, destination, noise_standard_deviations);
             }
         }
         else
         {
             // Does not require modulus switching
-            util::encrypt_zero_symmetric(secret_key_, context_, parms_id, is_ntt_form, save_seed, destination, noise_standard_deviation);
+            util::encrypt_zero_symmetric(
+                secret_key_, context_, parms_id, is_ntt_form, save_seed, destination, noise_standard_deviations);
         }
     }
 
     // Modified by Dice15.
     void Encryptor::encrypt_internal(
         const Plaintext &plain, bool is_asymmetric, bool save_seed, Ciphertext &destination,
-        double noise_standard_deviation, MemoryPoolHandle pool) const
+        vector<double> noise_standard_deviations, MemoryPoolHandle pool) const
     {
         // Minimal verification that the keys are set
         if (is_asymmetric)
@@ -209,7 +212,8 @@ namespace seal
                 throw invalid_argument("plain cannot be in NTT form");
             }
 
-            encrypt_zero_internal(context_.first_parms_id(), is_asymmetric, save_seed, destination, noise_standard_deviation, pool);
+            encrypt_zero_internal(
+                context_.first_parms_id(), is_asymmetric, save_seed, destination, noise_standard_deviations, pool);
 
             // Multiply plain by scalar coeff_div_plaintext and reposition if in upper-half.
             // Result gets added into the c_0 term of ciphertext (c_0,c_1).
@@ -227,7 +231,8 @@ namespace seal
             {
                 throw invalid_argument("plain is not valid for encryption parameters");
             }
-            encrypt_zero_internal(plain.parms_id(), is_asymmetric, save_seed, destination, noise_standard_deviation, pool);
+            encrypt_zero_internal(
+                plain.parms_id(), is_asymmetric, save_seed, destination, noise_standard_deviations, pool);
 
             auto &parms = context_.get_context_data(plain.parms_id())->parms();
             auto &coeff_modulus = parms.coeff_modulus();
@@ -247,7 +252,8 @@ namespace seal
             {
                 throw invalid_argument("plain cannot be in NTT form");
             }
-            encrypt_zero_internal(context_.first_parms_id(), is_asymmetric, save_seed, destination, noise_standard_deviation, pool);
+            encrypt_zero_internal(
+                context_.first_parms_id(), is_asymmetric, save_seed, destination, noise_standard_deviations, pool);
 
             auto &context_data = *context_.first_context_data();
             auto &parms = context_data.parms();

@@ -29,10 +29,11 @@ namespace seal
 
     public:
         NoiseFlooding(
-            const SEALContext &context, const Encryptor &encryptor, uint64_t a_max, double sigma, uint64_t tau)
+            const SEALContext &context, const Encryptor &encryptor, uint64_t a_max, double sigma, double tau0,
+            double tau1)
             : Evaluator(context), context_(context), encryptor_(encryptor),
               first_parms_(context.first_context_data()->parms()), a_max_(a_max),
-              t_(first_parms_.plain_modulus().value()), sigma_(sigma), tau_(tau)
+              t_(first_parms_.plain_modulus().value()), sigma_(sigma), tau0_(tau0), tau1_(tau1)
         {
             // Verify parameters.
             if (first_parms_.scheme() != scheme_type::bfv)
@@ -50,6 +51,8 @@ namespace seal
             // rate from exploding.
             double c_max_ = static_cast<double>(a_max_) / static_cast<double>(t_);
             b_ = (abs(c_max_) > 1e-4) ? 8 : 0;
+            cout << b_ << ' ' << c_max_ << ' ' << 1e-4 << '\n';
+
             make_cdt_tables();
         }
 
@@ -160,7 +163,7 @@ namespace seal
             Ciphertext &encrypted, const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt_zero(enc_mask, tau_, pool);
+            encryptor_.encrypt_zero(enc_mask, { tau0_, tau1_ }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }
@@ -187,7 +190,7 @@ namespace seal
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt_symmetric(r, enc_mask, tau_, pool);
+            encryptor_.encrypt_symmetric(r, enc_mask, { tau0_, tau1_ }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }
@@ -286,6 +289,26 @@ namespace seal
                     else
                     {
                         target_poly[j] = negate_uint_mod(q_i.reduce(static_cast<uint64_t>(-coset_sample)), q_i);
+                    }
+
+                    if (j < 10)
+                    {
+                        // 1. 원본 평문 계수 안전하게 가져오기
+                        uint64_t original_a = (j < plain_coeff_count) ? plain[j] : 0;
+
+                        // 2. 🚨 t_를 부호 있는 정수(int64_t)로 강제 캐스팅하여 음수 모듈로 연산 수행!
+                        int64_t signed_t = static_cast<int64_t>(t_);
+                        uint64_t recovered_a = static_cast<uint64_t>(((coset_sample % signed_t) + signed_t) % signed_t);
+
+                        cout << "idx " << j << " | 원본 a: " << original_a << " | Coset 샘플(r): " << coset_sample
+                             << " (복원값: " << recovered_a << ")"
+                             << " | q_i 변환값: " << target_poly[j] << endl;
+
+                        // 검증 로직 (디버깅용)
+                        if (original_a != recovered_a)
+                        {
+                            cout << "🚨 [경고] 샘플링 오류: 원본 a와 모듈로 t 복원값이 다릅니다!" << endl;
+                        }
                     }
                 }
             });
@@ -412,7 +435,9 @@ namespace seal
 
         const double sigma_;
 
-        const uint64_t tau_;
+        const double tau0_;
+
+        const double tau1_;
 
         size_t b_;
 

@@ -10,6 +10,9 @@
 #include "seal/randomgen.h"
 #include "seal/secretkey.h"
 #include <cstdint>
+#include <vector>
+
+using namespace std;
 
 namespace seal
 {
@@ -25,7 +28,7 @@ namespace seal
         void sample_poly_ternary(
             std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms,
             std::uint64_t *destination);
-        
+
         // Added by Dice15
         /**
         Generate a sparse ternary polynomial with a specified Hamming weight
@@ -49,8 +52,8 @@ namespace seal
         @param[out] destination Allocated space to store a random polynomial
         */
         void sample_poly_normal(
-            std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms,
-            std::uint64_t *destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
+            std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, std::uint64_t *destination,
+            double noise_standard_deviation = global_variables::noise_standard_deviation);
 
         /**
         Generate a polynomial from a centered binomial distribution and store in RNS representation.
@@ -60,8 +63,8 @@ namespace seal
         @param[out] destination Allocated space to store a random polynomial
         */
         void sample_poly_cbd(
-            std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms,
-            std::uint64_t *destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
+            std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, std::uint64_t *destination,
+            double noise_standard_deviation = global_variables::noise_standard_deviation);
 
         /**
         Generate a uniformly random polynomial and store in RNS representation.
@@ -110,7 +113,9 @@ namespace seal
         */
         void encrypt_zero_asymmetric(
             const PublicKey &public_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            Ciphertext &destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
+            Ciphertext &destination,
+            vector<double> noise_standard_deviations =
+                vector<double>(2, util::global_variables::noise_standard_deviation));
 
         /**
         Modified by Dice15.
@@ -126,6 +131,8 @@ namespace seal
         */
         void encrypt_zero_symmetric(
             const SecretKey &secret_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            bool save_seed, Ciphertext &destination, double noise_standard_deviation = global_variables::noise_standard_deviation);
+            bool save_seed, Ciphertext &destination,
+            vector<double> noise_standard_deviations =
+                vector<double>(1, util::global_variables::noise_standard_deviation));
     } // namespace util
 } // namespace seal
