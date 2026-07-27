@@ -142,8 +142,6 @@ namespace seal
                     return a + static_cast<int64_t>(t_) * k0;
                 }
 
-                // TODO: delete
-                counting();
             }
         }
 
