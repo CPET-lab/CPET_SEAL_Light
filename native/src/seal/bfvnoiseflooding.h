@@ -64,7 +64,7 @@ namespace seal
         The function internally centers the input coefficient, selects the appropriate quantized CDT table,
         and applies rejection sampling to perfectly correct the residual offset.
         */
-        int64_t sample_coset_discrete_gaussian(uint64_t coeff) const
+        inline int64_t sample_coset_discrete_gaussian(uint64_t coeff) const
         {
             // Center the plaintext coefficient to the range [-t/2, t/2).
             // Since the centered value can be negative, we must use int64_t.
@@ -152,7 +152,7 @@ namespace seal
         Multiplies a Ciphertext with a Plaintext using the noise flooding technique.
         The result is stored in the destination parameter.
         */
-        void multiply_plain_with_noise_flooding(
+        inline void multiply_plain_with_noise_flooding(
             const Ciphertext &encrypted, const Plaintext &plain, Ciphertext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
@@ -165,7 +165,7 @@ namespace seal
         This function generates a temporary zero-encryption mask and samples a discrete Gaussian error
         over the coset for the plaintext multiplication to achieve circuit privacy.
         */
-        void multiply_plain_with_noise_flooding_inplace(
+        inline void multiply_plain_with_noise_flooding_inplace(
             Ciphertext &encrypted, const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
@@ -178,7 +178,7 @@ namespace seal
         Multiplies a Ciphertext with a Plaintext using the noise flooding technique with a provided random plaintext r.
         The result is stored in the destination parameter.
         */
-        void multiply_plain_with_noise_flooding(
+        inline void multiply_plain_with_noise_flooding(
             const Ciphertext &encrypted, const Plaintext &plain, const Plaintext &r, Ciphertext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
@@ -191,7 +191,7 @@ namespace seal
         Multiplies a Ciphertext with a Plaintext using the noise flooding technique in-place,
         using a provided random plaintext r for symmetric encryption of the mask.
         */
-        void multiply_plain_with_noise_flooding_inplace(
+        inline void multiply_plain_with_noise_flooding_inplace(
             Ciphertext &encrypted, const Plaintext &plain, const Plaintext &r,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
@@ -206,7 +206,7 @@ namespace seal
         Samples a discrete Gaussian error for each coefficient of the plaintext over its corresponding coset,
         transforms the noisy plaintext into NTT form, and performs dyadic multiplication with the ciphertext.
         */
-        void multiply_coset_plain(
+        inline void multiply_coset_plain(
             Ciphertext &encrypted, const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             // Extract encryption parameters.
@@ -319,7 +319,7 @@ namespace seal
         Depending on the parameter b_, it either generates a single table (b_ = 0) centered at 0.0,
         or multiple quantized tables (b_ > 0) to support arbitrary centers in [-0.5, 0.5].
         */
-        void make_cdt_tables()
+        inline void make_cdt_tables()
         {
             int64_t num_tables = (b_ == 0) ? 1 : ((1 << b_) + 1);
             cdts_.resize(num_tables);
@@ -346,7 +346,7 @@ namespace seal
         Constructs a single CDT table for a specific center c_tilde.
         The table covers the range [-B, B] where B is bounded by ceil(6 * s) + 1.
         */
-        void construct_cdt_table(CDTTable &cdt, double c_tilde) const
+        inline void construct_cdt_table(CDTTable &cdt, double c_tilde) const
         {
             cdt.s = sigma_ / static_cast<double>(t_);
             cdt.c_tilde = c_tilde;
