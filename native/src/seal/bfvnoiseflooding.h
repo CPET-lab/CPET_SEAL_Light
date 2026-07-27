@@ -1,7 +1,6 @@
 #pragma once
 
 #include "seal/util/polyarithsmallmod.h"
-#include "seal/util/timer.h"
 #include <cstdint>
 #include <seal/seal.h>
 
