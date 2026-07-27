@@ -4,7 +4,6 @@
 #pragma once
 
 #include "seal/batchencoder.h"
-#include "seal/bfvnoiseflooding.h"
 #include "seal/ciphertext.h"
 #include "seal/ckks.h"
 #include "seal/coeffencoder.h"
@@ -29,3 +28,6 @@
 #include "seal/serialization.h"
 #include "seal/valcheck.h"
 #include "seal/version.h"
+
+//added by Dice15
+#include "seal/bfvnoiseflooding.h"
