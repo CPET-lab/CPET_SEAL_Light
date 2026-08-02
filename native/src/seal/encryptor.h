@@ -138,7 +138,7 @@ namespace seal
             const Plaintext &plain, Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             encrypt_internal(
-                plain, true, false, destination, vector<double>(2, util::global_variables::noise_standard_deviation),
+                plain, true, false, destination, vector<double>(3, util::global_variables::noise_standard_deviation),
                 pool);
         }
         inline void encrypt(
@@ -172,7 +172,7 @@ namespace seal
         {
             Ciphertext destination;
             encrypt_internal(
-                plain, true, true, destination, vector<double>(2, util::global_variables::noise_standard_deviation),
+                plain, true, true, destination, vector<double>(3, util::global_variables::noise_standard_deviation),
                 pool);
             return destination;
         }
@@ -205,7 +205,7 @@ namespace seal
         {
             encrypt_zero(
                 context_.first_parms_id(), destination,
-                vector<double>(2, util::global_variables::noise_standard_deviation), pool);
+                vector<double>(3, util::global_variables::noise_standard_deviation), pool);
         }
         inline void encrypt_zero(
             Ciphertext &destination, vector<double> noise_standard_deviations,
@@ -235,7 +235,7 @@ namespace seal
         {
             Ciphertext destination;
             encrypt_zero_internal(
-                parms_id, true, true, destination, vector<double>(2, util::global_variables::noise_standard_deviation),
+                parms_id, true, true, destination, vector<double>(3, util::global_variables::noise_standard_deviation),
                 pool);
             return destination;
         }
@@ -270,7 +270,7 @@ namespace seal
             parms_id_type parms_id, Ciphertext &destination, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             encrypt_zero_internal(
-                parms_id, true, false, destination, vector<double>(2, util::global_variables::noise_standard_deviation),
+                parms_id, true, false, destination, vector<double>(3, util::global_variables::noise_standard_deviation),
                 pool);
         }
         inline void encrypt_zero(
@@ -298,7 +298,7 @@ namespace seal
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             return encrypt_zero(
-                context_.first_parms_id(), vector<double>(2, util::global_variables::noise_standard_deviation), pool);
+                context_.first_parms_id(), vector<double>(3, util::global_variables::noise_standard_deviation), pool);
         }
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero(
             vector<double> noise_standard_deviations, MemoryPoolHandle pool = MemoryManager::GetPool()) const

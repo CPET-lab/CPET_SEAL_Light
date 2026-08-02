@@ -44,12 +44,20 @@ namespace seal
             size_t hwt);
 
         /**
-        Modified by Dice15.
         Generate a polynomial from a normal distribution and store in RNS representation.
+        Samples a noise polynomial from a discrete Gaussian distribution and adds
+        the modulo q_i reduced noise to the destination polynomial in RNS form.
+
+        If noise_standard_deviation < 2^53, the function uses the default SEAL
+        ClippedNormalDistribution for maximum performance.
+        If noise_standard_deviation >= 2^53, it applies exact integer scaling with a
+        2-Gaussian convolution (y0 * sigma + y1 * 2^40) to prevent precision loss in
+        lower bits caused by floating-point mantissa limitations (IEEE 754).
 
         @param[in] prng A uniform random generator
         @param[in] parms EncryptionParameters used to parameterize an RNS polynomial
         @param[out] destination Allocated space to store a random polynomial
+        @param[in] noise_standard_deviation Standard deviation of the Gaussian distribution.
         */
         void sample_poly_normal(
             std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, std::uint64_t *destination,

@@ -86,16 +86,104 @@ namespace seal
                 return;
             }
 
-            RandomToStandardAdapter engine(prng);
-            ClippedNormalDistribution dist(0, noise_standard_deviation, noise_max_deviation);
+            // IEEE 754 double-precision float mantissa limit (2^53 = 9007199254740992.0).
+            constexpr double DOUBLE_PRECISION_LIMIT = 9007199254740992.0;
 
-            SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
-                int64_t noise = static_cast<int64_t>(dist(engine));
-                uint64_t flag = static_cast<uint64_t>(-static_cast<int64_t>(noise < 0));
-                SEAL_ITERATE(
-                    iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size,
-                    [&](auto J) { *get<0>(J) = static_cast<uint64_t>(noise) + (flag & get<1>(J).value()); });
-            });
+            if (noise_standard_deviation < DOUBLE_PRECISION_LIMIT)
+            {
+                // Standard mode: Use default SEAL ClippedNormalDistribution for small standard deviations.
+                RandomToStandardAdapter engine(prng);
+                ClippedNormalDistribution dist(0, noise_standard_deviation, noise_max_deviation);
+
+                SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
+                    int64_t noise = static_cast<int64_t>(dist(engine));
+                    uint64_t flag = static_cast<uint64_t>(-static_cast<int64_t>(noise < 0));
+                    SEAL_ITERATE(
+                        iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size,
+                        [&](auto J) { *get<0>(J) = static_cast<uint64_t>(noise) + (flag & get<1>(J).value()); });
+                });
+            }
+            else
+            {
+                // High-precision mode: Use 2-Gaussian convolution with exact fixed-point integer scaling.
+
+                // Generates a pair of independent standard normal random variables N(0, 1)
+                // using the Box-Muller transform over a 53-bit uniform random bitstream.
+                auto unit_normal_pair = [&]() -> pair<double, double> {
+                    uint64_t rand1, rand2;
+                    prng->generate(sizeof(uint64_t), reinterpret_cast<seal_byte *>(&rand1));
+                    prng->generate(sizeof(uint64_t), reinterpret_cast<seal_byte *>(&rand2));
+
+                    // Map uniform 53-bit integers to double in (0, 1] for u1 and [0, 1) for u2.
+                    double u1 = (static_cast<double>(rand1 >> 11) + 1.0) * (1.0 / (1ULL << 53));
+                    double u2 = static_cast<double>(rand2 >> 11) * (1.0 / (1ULL << 53));
+
+                    double r = sqrt(-2.0 * log(u1));
+                    double t = 2.0 * M_PI * u2;
+                    return { r * cos(t), r * sin(t) };
+                };
+
+                // Converts a double floating-point value y to an exact __int128_t
+                // fixed-point integer scaled by 2^(log_scale + F) without losing mantissa precision.
+                constexpr int F = 50; // Fixed-point fractional bits for 128-bit integer capacity.
+                auto exact_scaled = [F](double y, int log_scale) -> __int128_t {
+                    int e;
+                    double fr = frexp(y, &e); // Decompose y = fr * 2^e, where fr in [0.5, 1.0).
+                    int64_t m = static_cast<int64_t>(fr * 9007199254740992.0); // Exact 53-bit integer mantissa.
+
+                    int sh = e - 53 + log_scale + F;
+                    __int128_t val = static_cast<__int128_t>(m);
+
+                    if (sh >= 0)
+                    {
+                        return val << sh;
+                    }
+                    else
+                    {
+                        // Return exact 0 on underflow, matching Python logic (m << sh if sh >= 0 else 0).
+                        return 0;
+                    }
+                };
+
+                __int128_t sigma_128 = static_cast<__int128_t>(noise_standard_deviation);
+
+                SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
+                    double y0, y1;
+
+                    // Bulk tail cut: Resample outliers where |y0| > 10.5 (probability ~ 2^-82).
+                    do
+                    {
+                        auto p = unit_normal_pair();
+                        y0 = p.first;
+                        y1 = p.second;
+                    } while (abs(y0) > 10.5);
+
+                    // Compute A = sigma * y0 * 2^F via exact multi-precision integer multiplication.
+                    __int128_t A = sigma_128 * exact_scaled(y0, 0);
+
+                    // Compute B = 2^40 * y1 * 2^F (auxiliary dither Gaussian to fill lower bits).
+                    __int128_t B = exact_scaled(y1, 40);
+
+                    // Exact 128-bit integer addition followed by round-to-nearest right shift.
+                    __int128_t S = A + B;
+                    __int128_t rounded_noise = (S + (static_cast<__int128_t>(1) << (F - 1))) >> F;
+
+                    // Perform modulo reduction for each RNS prime q_i in the moduli chain.
+                    SEAL_ITERATE(
+                        iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size, [&](auto J) {
+                            uint64_t q_i = get<1>(J).value();
+
+                            // 128-bit modulo reduction with negative result correction.
+                            int64_t reduced = static_cast<int64_t>(rounded_noise % static_cast<__int128_t>(q_i));
+                            if (reduced < 0)
+                            {
+                                reduced += q_i;
+                            }
+
+                            *get<0>(J) = static_cast<uint64_t>(reduced);
+                        });
+                });
+            }
         }
 
         void sample_poly_cbd(
@@ -233,11 +321,13 @@ namespace seal
                 throw invalid_argument("public key is not valid for the encryption parameters");
             }
 #endif
-            // Verify parameters.
-            if (noise_standard_deviations.size() != public_key.data().size())
+            // Verify parameters: size must be public_key.size() + 1 (typically 2 + 1 = 3).
+            // Index 0: tau_0 for e'_0
+            // Index 1: tau_1 for e'_1
+            // Index 2: tau_2 for e'_2 (acting as 'u')
+            if (noise_standard_deviations.size() != (public_key.data().size() + 1))
             {
-                throw invalid_argument(
-                    "noise_standard_deviations size must match the size of the public key (typically 2)");
+                throw invalid_argument("noise_standard_deviations size must match public key size + 1 (typically 3)");
             }
 
             // We use a fresh memory pool with `clear_on_destruction' enabled
@@ -266,21 +356,15 @@ namespace seal
             // Create a PRNG; u and the noise/error share the same PRNG
             auto prng = parms.random_generator()->create();
 
-            // Modified by Dice15.
-            // Generate u <-- R_3 for noise flooding.
-            // According to Definition 4, the zero encryption term is: e'_2 * pk + (e'_0, e'_1).
-            // - e'_0 is sampled with standard deviation \tau_0 (noise_standard_deviations[0]).
-            // - e'_1 and e'_2 are sampled with standard deviation \tau_1 (noise_standard_deviations[1]).
-            // Therefore, instead of standard u <-- R_3 (ternary), we sample 'u' (acting as e'_2)
-            // using noise_standard_deviations[1] (which represents \tau_1).
+            // Generate u (acting as e'_2) using noise_standard_deviations[2]
             auto u(allocate_poly(coeff_count, coeff_modulus_size, pool));
-            if (are_close(noise_standard_deviations[1], 3.2))
+            if (are_close(noise_standard_deviations[2], 3.2))
             {
-                sample_poly_cbd(prng, parms, u.get(), noise_standard_deviations[1]);
+                sample_poly_cbd(prng, parms, u.get(), noise_standard_deviations[2]);
             }
             else
             {
-                sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[1]);
+                sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[2]);
             }
             // sample_poly_ternary(prng, parms, u.get());
 

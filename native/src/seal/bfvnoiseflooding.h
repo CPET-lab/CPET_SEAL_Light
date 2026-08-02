@@ -36,11 +36,12 @@ namespace seal
 
     public:
         NoiseFlooding(
-            const SEALContext &context, const Encryptor &encryptor, uint64_t a_max, double sigma, double tau0,
-            double tau1, size_t b = 0)
+            const SEALContext &context, const Encryptor &encryptor, uint64_t a_max, double sigma, double nu,
+            double tau0, double tau1, size_t b = 0)
             : Evaluator(context), context_(context), encryptor_(encryptor),
               first_parms_(context.first_context_data()->parms()), prng_(first_parms_.random_generator()->create()),
-              a_max_(a_max), t_(first_parms_.plain_modulus().value()), sigma_(sigma), tau0_(tau0), tau1_(tau1), b_(b)
+              a_max_(a_max), t_(first_parms_.plain_modulus().value()), sigma_(sigma), nu_(nu), tau0_(tau0), tau1_(tau1),
+              b_(b)
         {
             // Verify parameters.
             if (first_parms_.scheme() != scheme_type::bfv)
@@ -218,7 +219,7 @@ namespace seal
             Ciphertext &encrypted, const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt_zero(enc_mask, { tau0_, tau1_ }, pool);
+            encryptor_.encrypt_zero(enc_mask, { static_cast<double>(t_) * nu_, tau0_, tau1_ }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }
@@ -245,7 +246,7 @@ namespace seal
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt(r, enc_mask, { tau0_, tau1_ }, pool);
+            encryptor_.encrypt(r, enc_mask, { static_cast<double>(t_) * nu_, tau0_, tau1_ }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }
@@ -474,6 +475,8 @@ namespace seal
         const uint64_t t_;
 
         const double sigma_;
+
+        const double nu_;
 
         const double tau0_;
 
