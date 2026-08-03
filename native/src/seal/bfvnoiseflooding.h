@@ -219,7 +219,7 @@ namespace seal
             Ciphertext &encrypted, const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt_zero(enc_mask, { static_cast<double>(t_) * nu_, tau0_, tau1_ }, pool);
+            encryptor_.encrypt_zero(enc_mask, { nu_, tau0_, tau1_ }, { t_, 1, 1 }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }
@@ -246,7 +246,7 @@ namespace seal
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt(r, enc_mask, { static_cast<double>(t_) * nu_, tau0_, tau1_ }, pool);
+            encryptor_.encrypt(r, enc_mask, { nu_, tau0_, tau1_ }, { t_, 1, 1 }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }

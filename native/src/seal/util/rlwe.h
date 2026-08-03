@@ -61,7 +61,8 @@ namespace seal
         */
         void sample_poly_normal(
             std::shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, std::uint64_t *destination,
-            double noise_standard_deviation = global_variables::noise_standard_deviation);
+            double noise_standard_deviation = global_variables::noise_standard_deviation,
+            uint64_t inverse_scale_factor = 1);
 
         /**
         Generate a polynomial from a centered binomial distribution and store in RNS representation.
@@ -123,7 +124,8 @@ namespace seal
             const PublicKey &public_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
             Ciphertext &destination,
             vector<double> noise_standard_deviations =
-                vector<double>(2, util::global_variables::noise_standard_deviation));
+                vector<double>(3, util::global_variables::noise_standard_deviation),
+            vector<uint64_t> inverse_scale_factors = vector<uint64_t>(3, 1));
 
         /**
         Modified by Dice15.
@@ -141,6 +143,7 @@ namespace seal
             const SecretKey &secret_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
             bool save_seed, Ciphertext &destination,
             vector<double> noise_standard_deviations =
-                vector<double>(1, util::global_variables::noise_standard_deviation));
+                vector<double>(1, util::global_variables::noise_standard_deviation),
+            vector<uint64_t> inverse_scale_factors = vector<uint64_t>(1, 1));
     } // namespace util
 } // namespace seal

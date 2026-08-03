@@ -72,13 +72,14 @@ namespace seal
 
         void sample_poly_normal(
             shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination,
-            double noise_standard_deviation)
+            double noise_standard_deviation, uint64_t inverse_scale_factor)
         {
             auto coeff_modulus = parms.coeff_modulus();
             size_t coeff_modulus_size = coeff_modulus.size();
             size_t coeff_count = parms.poly_modulus_degree();
+            double noise_standard_deviation_tilde = noise_standard_deviation * inverse_scale_factor;
             double noise_max_deviation =
-                noise_standard_deviation * global_variables::noise_distribution_width_multiplier;
+                noise_standard_deviation_tilde * global_variables::noise_distribution_width_multiplier;
 
             if (are_close(noise_max_deviation, 0.0))
             {
@@ -86,17 +87,30 @@ namespace seal
                 return;
             }
 
+            vector<uint64_t> t_inv_array(coeff_modulus_size, 1);
+            if (inverse_scale_factor != 1)
+            {
+                for (size_t i = 0; i < coeff_modulus_size; i++)
+                {
+                    uint64_t reduced_t = inverse_scale_factor % coeff_modulus[i].value();
+                    if (reduced_t == 0 || !util::try_invert_uint_mod(reduced_t, coeff_modulus[i], t_inv_array[i]))
+                    {
+                        throw logic_error("inverse_scale_factor is not coprime to coeff_modulus");
+                    }
+                }
+            }
+
             // IEEE 754 double-precision float mantissa limit (2^53 = 9007199254740992.0).
             constexpr double DOUBLE_PRECISION_LIMIT = 9007199254740992.0;
 
-            if (noise_standard_deviation < DOUBLE_PRECISION_LIMIT)
+            if (noise_standard_deviation_tilde < DOUBLE_PRECISION_LIMIT)
             {
                 // Standard mode: Use default SEAL ClippedNormalDistribution for small standard deviations.
                 RandomToStandardAdapter engine(prng);
-                ClippedNormalDistribution dist(0, noise_standard_deviation, noise_max_deviation);
+                ClippedNormalDistribution dist(0, noise_standard_deviation_tilde, noise_max_deviation);
 
                 SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
-                    int64_t noise = static_cast<int64_t>(dist(engine));
+                    int64_t noise = std::lround(dist(engine) / static_cast<double>(inverse_scale_factor));
                     uint64_t flag = static_cast<uint64_t>(-static_cast<int64_t>(noise < 0));
                     SEAL_ITERATE(
                         iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size,
@@ -145,7 +159,7 @@ namespace seal
                     }
                 };
 
-                __int128_t sigma_128 = static_cast<__int128_t>(noise_standard_deviation);
+                __int128_t sigma_128 = static_cast<__int128_t>(noise_standard_deviation_tilde);
 
                 SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
                     double y0, y1;
@@ -165,12 +179,13 @@ namespace seal
                     __int128_t B = exact_scaled(y1, 40);
 
                     // Exact 128-bit integer addition followed by round-to-nearest right shift.
-                    __int128_t S = A + B;
+                    __int128_t S = (A + B) / static_cast<__int128_t>(inverse_scale_factor);
                     __int128_t rounded_noise = (S + (static_cast<__int128_t>(1) << (F - 1))) >> F;
 
                     // Perform modulo reduction for each RNS prime q_i in the moduli chain.
                     SEAL_ITERATE(
-                        iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size, [&](auto J) {
+                        iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus, t_inv_array), coeff_modulus_size,
+                        [&](auto J) {
                             uint64_t q_i = get<1>(J).value();
 
                             // 128-bit modulo reduction with negative result correction.
@@ -313,7 +328,7 @@ namespace seal
 
         void encrypt_zero_asymmetric(
             const PublicKey &public_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            Ciphertext &destination, vector<double> noise_standard_deviations)
+            Ciphertext &destination, vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors)
         {
 #ifdef SEAL_DEBUG
             if (!is_valid_for(public_key, context))
@@ -328,6 +343,10 @@ namespace seal
             if (noise_standard_deviations.size() != (public_key.data().size() + 1))
             {
                 throw invalid_argument("noise_standard_deviations size must match public key size + 1 (typically 3)");
+            }
+            if (inverse_scale_factors.size() != (public_key.data().size() + 1))
+            {
+                throw invalid_argument("inverse_scale_factors size must match public key size + 1 (typically 3)");
             }
 
             // We use a fresh memory pool with `clear_on_destruction' enabled
@@ -358,13 +377,13 @@ namespace seal
 
             // Generate u (acting as e'_2) using noise_standard_deviations[2]
             auto u(allocate_poly(coeff_count, coeff_modulus_size, pool));
-            if (are_close(noise_standard_deviations[2], 3.2))
+            if (are_close(noise_standard_deviations[2], 3.2) && inverse_scale_factors[2] == 1)
             {
                 sample_poly_cbd(prng, parms, u.get(), noise_standard_deviations[2]);
             }
             else
             {
-                sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[2]);
+                sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[2], inverse_scale_factors[2]);
             }
             // sample_poly_ternary(prng, parms, u.get());
 
@@ -391,13 +410,13 @@ namespace seal
             // c[j] = public_key[j] * u + e[j] in BFV/CKKS, = public_key[j] * u + p * e[j] in BGV,
             for (size_t j = 0; j < encrypted_size; j++)
             {
-                if (are_close(noise_standard_deviations[j], 3.2))
+                if (are_close(noise_standard_deviations[j], 3.2) && inverse_scale_factors[j] == 1)
                 {
                     sample_poly_cbd(prng, parms, u.get(), noise_standard_deviations[j]);
                 }
                 else
                 {
-                    sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[j]);
+                    sample_poly_normal(prng, parms, u.get(), noise_standard_deviations[j], inverse_scale_factors[j]);
                 }
                 // SEAL_NOISE_SAMPLER(prng, parms, u.get(), noise_standard_deviation);
                 RNSIter gaussian_iter(u.get(), coeff_count);
@@ -426,7 +445,8 @@ namespace seal
 
         void encrypt_zero_symmetric(
             const SecretKey &secret_key, const SEALContext &context, parms_id_type parms_id, bool is_ntt_form,
-            bool save_seed, Ciphertext &destination, vector<double> noise_standard_deviations)
+            bool save_seed, Ciphertext &destination, vector<double> noise_standard_deviations,
+            vector<uint64_t> inverse_scale_factors)
         {
 #ifdef SEAL_DEBUG
             if (!is_valid_for(secret_key, context))
@@ -438,6 +458,10 @@ namespace seal
             if (noise_standard_deviations.size() != 1)
             {
                 throw invalid_argument("noise_standard_deviations size must be exactly 1 for symmetric encryption");
+            }
+            if (inverse_scale_factors.size() != 1)
+            {
+                throw invalid_argument("inverse_scale_factors size must be exactly 1 for symmetric encryption");
             }
 
             // We use a fresh memory pool with `clear_on_destruction' enabled.
@@ -509,13 +533,14 @@ namespace seal
             // Modified by Dice15.
             // Sample e <-- chi
             auto noise(allocate_poly(coeff_count, coeff_modulus_size, pool));
-            if (are_close(noise_standard_deviations[0], 3.2))
+            if (are_close(noise_standard_deviations[0], 3.2) && inverse_scale_factors[0] == 1)
             {
                 sample_poly_cbd(bootstrap_prng, parms, noise.get(), noise_standard_deviations[0]);
             }
             else
             {
-                sample_poly_normal(bootstrap_prng, parms, noise.get(), noise_standard_deviations[0]);
+                sample_poly_normal(
+                    bootstrap_prng, parms, noise.get(), noise_standard_deviations[0], inverse_scale_factors[0]);
             }
             // SEAL_NOISE_SAMPLER(bootstrap_prng, parms, noise.get(), noise_standard_deviation);
 
