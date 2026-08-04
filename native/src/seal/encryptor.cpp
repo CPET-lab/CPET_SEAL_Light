@@ -85,7 +85,6 @@ namespace seal
         }
     }
 
-    // Modified by Dice15.
     void Encryptor::encrypt_zero_internal(
         parms_id_type parms_id, bool is_asymmetric, bool save_seed, Ciphertext &destination,
         vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors, MemoryPoolHandle pool) const
@@ -180,7 +179,6 @@ namespace seal
         }
     }
 
-    // Modified by Dice15.
     void Encryptor::encrypt_internal(
         const Plaintext &plain, bool is_asymmetric, bool save_seed, Ciphertext &destination,
         vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors, MemoryPoolHandle pool) const

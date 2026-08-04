@@ -1,7 +1,6 @@
 #pragma once
 
 #include "seal/util/polyarithsmallmod.h"
-#include "seal/util/timer.h"
 #include <cstdint>
 #include <seal/seal.h>
 
@@ -35,13 +34,38 @@ namespace seal
         };
 
     public:
+        /**
+        Creates a NoiseFlooding instance for statistical circuit privacy.
+
+        Noise flooding achieves statistical circuit privacy by adding a fresh encryption of
+        a mask to a target ciphertext. For pure noise flooding, a zero-encryption Enc(0, e')
+        is added to obliterate noise leakage. When evaluating a linear transformation with
+        an additive plaintext mask b for the underlying message, homomorphic linearity allows
+        combining the mask encryption directly into r * c + Enc(b, e'), since
+        r * c + Enc(0, e') + b = r * c + Enc(b, e').
+
+        The mask ciphertext is generated as Enc(b, e') = (pk_0 * u + e'_0 + b, pk_1 * u + e'_1),
+        where ephemeral randomness u (e'_2) and error components (e'_0, e'_1) are sampled with
+        standard deviations (tau2, tau0, tau1), with e'_0 sampled over the fractional lattice (1/t)*Z^n,
+        and r is a coset-sampled masking polynomial bounded by coeff_norm.
+
+        @param[in] context The SEALContext
+        @param[in] encryptor The Encryptor used for generating mask ciphertexts
+        @param[in] coeff_norm The infinity norm bound of the coset masking polynomial r
+        @param[in] sigma Standard deviation of the Gaussian distribution for coset masking polynomial r
+        @param[in] tau2 Standard deviation for sampling ephemeral key randomness u (e'_2)
+        @param[in] tau0 Target standard deviation for noise component e'_0 (over (1/t)*Z^n)
+        @param[in] tau1 Target standard deviation for noise component e'_1
+        @param[in] b Statistical security parameter for noise flooding (default: 0)
+        @throws std::invalid_argument if the scheme is not BFV
+        */
         NoiseFlooding(
-            const SEALContext &context, const Encryptor &encryptor, uint64_t a_max, double sigma, double nu,
+            const SEALContext &context, const Encryptor &encryptor, uint64_t coeff_norm, double sigma, double tau2,
             double tau0, double tau1, size_t b = 0)
             : Evaluator(context), context_(context), encryptor_(encryptor),
               first_parms_(context.first_context_data()->parms()), prng_(first_parms_.random_generator()->create()),
-              a_max_(a_max), t_(first_parms_.plain_modulus().value()), sigma_(sigma), nu_(nu), tau0_(tau0), tau1_(tau1),
-              b_(b)
+              coeff_norm_(coeff_norm), t_(first_parms_.plain_modulus().value()), sigma_(sigma), tau2_(tau2),
+              tau0_(tau0), tau1_(tau1), b_(b)
         {
             // Verify parameters.
             if (first_parms_.scheme() != scheme_type::bfv)
@@ -69,7 +93,7 @@ namespace seal
         void presampling(size_t coeff_count)
         {
             double s = sigma_ / static_cast<double>(t_);
-            double delta_max = static_cast<double>(a_max_) / static_cast<double>(t_);
+            double delta_max = static_cast<double>(coeff_norm_) / static_cast<double>(t_);
 
             // Calculate the upper bound M for the rejection sampling acceptance probability.
             // M = exp(pi * (12 * s * |delta_max| + delta_max^2) / s^2)
@@ -91,7 +115,7 @@ namespace seal
 
             for (size_t i = 0; i < target_samples; ++i)
             {
-                // Step 1: Generate the Gaussian error candidate (k0).
+                // Generate the Gaussian error candidate (k0).
                 // We generate a 128-bit uniform random integer u and use binary search
                 // (upper_bound) over the CDF table to extract k0 via inverse transform sampling.
                 uint64_t rand_h, rand_l;
@@ -105,12 +129,12 @@ namespace seal
                     });
                 int64_t k0 = (it != cdt.table.end()) ? it->k : cdt.B;
 
-                // Step 2: Generate a uniform random double v in [0, 1) for the rejection test.
+                // Generate a uniform random double v in [0, 1) for the rejection test.
                 uint64_t rand_v;
                 prng_->generate(sizeof(uint64_t), reinterpret_cast<seal_byte *>(&rand_v));
                 double v = static_cast<double>(rand_v >> 11) * (1.0 / (1ULL << 53));
 
-                // Step 3: Push the generated {k0, v} pair into the pre-sample stack.
+                // Push the generated {k0, v} pair into the pre-sample stack.
                 presample_stack_.push_back({ k0, v });
             }
         }
@@ -146,7 +170,7 @@ namespace seal
             const CDTTable &cdt = cdts_[table_idx];
             double delta = c - c_tilde;
             double delta_max = (b_ > 0) ? (1.0 / static_cast<double>(1ULL << (b_ + 1)))
-                                        : (static_cast<double>(a_max_) / static_cast<double>(t_));
+                                        : (static_cast<double>(coeff_norm_) / static_cast<double>(t_));
             double M_exp = M_PI * (12.0 * s * delta_max + delta_max * delta_max) / (s * s);
             double M = exp(M_exp);
 
@@ -188,13 +212,6 @@ namespace seal
                 {
                     return a + static_cast<int64_t>(t_) * k0;
                 }
-
-                // TODO: Delete
-                // 테스트 시 기각 횟수 체크용 코드이므로 추후에 삭제해야 함.
-                // if (presample_stack_.empty())
-                //{
-                //    counting();
-                //}
             }
         }
 
@@ -219,34 +236,40 @@ namespace seal
             Ciphertext &encrypted, const Plaintext &plain, MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt_zero(enc_mask, { nu_, tau0_, tau1_ }, { t_, 1, 1 }, pool);
+            encryptor_.encrypt_zero(enc_mask, { tau2_, tau0_, tau1_ }, { t_, 1, 1 }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }
 
         /**
-        Multiplies a Ciphertext with a Plaintext using the noise flooding technique with a provided random plaintext r.
-        The result is stored in the destination parameter.
+        Multiplies a Ciphertext with a Plaintext using the noise flooding technique.
+        Evaluates the linear transformation r * c + Enc(b, e') in-place by multiplying
+        the ciphertext with a coset-sampled plaintext multiplier and adding an encrypted
+        mask ciphertext Enc(b, e'), where b serves as the additive masking plaintext
+        for the origin vector.
         */
         void multiply_plain_with_noise_flooding(
-            const Ciphertext &encrypted, const Plaintext &plain, const Plaintext &r, Ciphertext &destination,
+            const Ciphertext &encrypted, const Plaintext &plain, const Plaintext &b, Ciphertext &destination,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
             destination = encrypted;
-            multiply_plain_with_noise_flooding_inplace(destination, plain, r, pool);
+            multiply_plain_with_noise_flooding_inplace(destination, plain, b, pool);
         }
 
         /**
-        Multiplies a Ciphertext with a Plaintext using the noise flooding technique in-place,
-        using a provided random plaintext r for symmetric encryption of the mask.
+        Multiplies a Ciphertext with a Plaintext using the noise flooding technique.
+        Evaluates the linear transformation r * c + Enc(b, e') by multiplying
+        the ciphertext with a coset-sampled plaintext multiplier and adding an encrypted
+        mask ciphertext Enc(b, e'), where b serves as the additive masking plaintext
+        for the origin vector. The result is stored in the destination parameter.
         */
         void multiply_plain_with_noise_flooding_inplace(
-            Ciphertext &encrypted, const Plaintext &plain, const Plaintext &r,
+            Ciphertext &encrypted, const Plaintext &plain, const Plaintext &b,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
         {
             Ciphertext enc_mask;
-            encryptor_.encrypt(r, enc_mask, { nu_, tau0_, tau1_ }, { t_, 1, 1 }, pool);
+            encryptor_.encrypt(b, enc_mask, { tau2_, tau0_, tau1_ }, { t_, 1, 1 }, pool);
             multiply_coset_plain(encrypted, plain, pool);
             add_inplace(encrypted, enc_mask);
         }
@@ -470,13 +493,13 @@ namespace seal
 
         const EncryptionParameters &first_parms_;
 
-        const uint64_t a_max_;
+        const uint64_t coeff_norm_;
 
         const uint64_t t_;
 
         const double sigma_;
 
-        const double nu_;
+        const double tau2_;
 
         const double tau0_;
 

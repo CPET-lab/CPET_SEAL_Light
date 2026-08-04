@@ -114,7 +114,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a plaintext with the public key and stores the result in
         destination.
 
@@ -141,6 +140,11 @@ namespace seal
                 plain, true, false, destination, vector<double>(3, util::global_variables::noise_standard_deviation),
                 vector<uint64_t>(3, 1), pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         inline void encrypt(
             const Plaintext &plain, Ciphertext &destination, vector<double> noise_standard_deviations,
             vector<uint64_t> inverse_scale_factors, MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -149,7 +153,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a plaintext with the public key and returns the ciphertext as
         a serializable object.
 
@@ -176,6 +179,11 @@ namespace seal
                 vector<uint64_t>(3, 1), pool);
             return destination;
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt(
             const Plaintext &plain, vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -186,7 +194,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a zero plaintext with the public key and stores the result in
         destination.
 
@@ -207,6 +214,11 @@ namespace seal
                 context_.first_parms_id(), destination,
                 vector<double>(3, util::global_variables::noise_standard_deviation), vector<uint64_t>(3, 1), pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         inline void encrypt_zero(
             Ciphertext &destination, vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -216,7 +228,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a zero plaintext with the public key and returns the ciphertext
         as a serializable object.
 
@@ -240,6 +251,11 @@ namespace seal
                 vector<uint64_t>(3, 1), pool);
             return destination;
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero(
             parms_id_type parms_id, vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -251,7 +267,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a zero plaintext with the public key and stores the result in
         destination.
 
@@ -275,6 +290,11 @@ namespace seal
                 parms_id, true, false, destination, vector<double>(3, util::global_variables::noise_standard_deviation),
                 vector<uint64_t>(3, 1), pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         inline void encrypt_zero(
             parms_id_type parms_id, Ciphertext &destination, vector<double> noise_standard_deviations,
             vector<uint64_t> inverse_scale_factors, MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -284,7 +304,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a zero plaintext with the public key and returns the ciphertext
         as a serializable object.
 
@@ -304,6 +323,11 @@ namespace seal
                 context_.first_parms_id(), vector<double>(3, util::global_variables::noise_standard_deviation),
                 vector<uint64_t>(3, 1), pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero(
             vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -312,7 +336,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a plaintext with the secret key and stores the result in
         destination.
 
@@ -339,6 +362,11 @@ namespace seal
                 plain, false, false, destination, vector<double>(1, util::global_variables::noise_standard_deviation),
                 vector<uint64_t>(1, 1), pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviation Target standard deviations for each noise component
+        @param[in] inverse_scale_factor Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         inline void encrypt_symmetric(
             const Plaintext &plain, Ciphertext &destination, double noise_standard_deviation,
             uint64_t inverse_scale_factor, MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -349,7 +377,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a plaintext with the secret key and returns the ciphertext as
         a serializable object.
 
@@ -381,6 +408,11 @@ namespace seal
                 vector<uint64_t>(1, 1), pool);
             return destination;
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviation Target standard deviations for each noise component
+        @param[in] inverse_scale_factor Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_symmetric(
             const Plaintext &plain, double noise_standard_deviation, uint64_t inverse_scale_factor,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -393,7 +425,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a zero plaintext with the secret key and stores the result in
         destination.
 
@@ -417,6 +448,11 @@ namespace seal
                 parms_id, false, false, destination,
                 vector<double>(1, util::global_variables::noise_standard_deviation), vector<uint64_t>(1, 1), pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviation Target standard deviations for each noise component
+        @param[in] inverse_scale_factor Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         inline void encrypt_zero_symmetric(
             parms_id_type parms_id, Ciphertext &destination, double noise_standard_deviation,
             uint64_t inverse_scale_factor, MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -456,6 +492,11 @@ namespace seal
                 vector<uint64_t>(1, 1), pool);
             return destination;
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviation Target standard deviations for each noise component
+        @param[in] inverse_scale_factor Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero_symmetric(
             parms_id_type parms_id, double noise_standard_deviation, uint64_t inverse_scale_factor,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -468,7 +509,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a zero plaintext with the secret key and stores the result in
         destination.
 
@@ -489,6 +529,11 @@ namespace seal
             encrypt_zero_symmetric(
                 context_.first_parms_id(), destination, util::global_variables::noise_standard_deviation, 1, pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviation Target standard deviations for each noise component
+        @param[in] inverse_scale_factor Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         inline void encrypt_zero_symmetric(
             Ciphertext &destination, double noise_standard_deviation, uint64_t inverse_scale_factor,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -498,7 +543,6 @@ namespace seal
         }
 
         /**
-        Modified by Dice15.
         Encrypts a zero plaintext with the secret key and returns the ciphertext
         as a serializable object.
 
@@ -523,6 +567,11 @@ namespace seal
             return encrypt_zero_symmetric(
                 context_.first_parms_id(), util::global_variables::noise_standard_deviation, 1, pool);
         }
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviation Target standard deviations for each noise component
+        @param[in] inverse_scale_factor Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         SEAL_NODISCARD inline Serializable<Ciphertext> encrypt_zero_symmetric(
             double noise_standard_deviation, uint64_t inverse_scale_factor,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const
@@ -545,13 +594,21 @@ namespace seal
 
         Encryptor &operator=(Encryptor &&assign) = delete;
 
-        // Modified by Dice15.
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         void encrypt_zero_internal(
             parms_id_type parms_id, bool is_asymmetric, bool save_seed, Ciphertext &destination,
             vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors,
             MemoryPoolHandle pool = MemoryManager::GetPool()) const;
 
-        // Modified by Dice15.
+        /**
+        [Modified by Dice15]
+        @param[in] noise_standard_deviations Target standard deviations for each noise component
+        @param[in] inverse_scale_factors Scaling denominators x for fractional lattice sampling over (1/x)*Z^n
+        */
         void encrypt_internal(
             const Plaintext &plain, bool is_asymmetric, bool save_seed, Ciphertext &destination,
             vector<double> noise_standard_deviations, vector<uint64_t> inverse_scale_factors,

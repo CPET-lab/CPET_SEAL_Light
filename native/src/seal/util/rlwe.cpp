@@ -37,7 +37,6 @@ namespace seal
             });
         }
 
-        // Added by Dice15
         void sample_poly_ternary_hwt(
             shared_ptr<UniformRandomGenerator> prng, const EncryptionParameters &parms, uint64_t *destination,
             size_t hwt)
@@ -77,7 +76,8 @@ namespace seal
             auto coeff_modulus = parms.coeff_modulus();
             size_t coeff_modulus_size = coeff_modulus.size();
             size_t coeff_count = parms.poly_modulus_degree();
-            double noise_standard_deviation_tilde = noise_standard_deviation * inverse_scale_factor;
+            double noise_standard_deviation_tilde =
+                noise_standard_deviation * static_cast<double>(inverse_scale_factor);
             double noise_max_deviation =
                 noise_standard_deviation_tilde * global_variables::noise_distribution_width_multiplier;
 
@@ -85,19 +85,6 @@ namespace seal
             {
                 set_zero_poly(coeff_count, coeff_modulus_size, destination);
                 return;
-            }
-
-            vector<uint64_t> t_inv_array(coeff_modulus_size, 1);
-            if (inverse_scale_factor != 1)
-            {
-                for (size_t i = 0; i < coeff_modulus_size; i++)
-                {
-                    uint64_t reduced_t = inverse_scale_factor % coeff_modulus[i].value();
-                    if (reduced_t == 0 || !util::try_invert_uint_mod(reduced_t, coeff_modulus[i], t_inv_array[i]))
-                    {
-                        throw logic_error("inverse_scale_factor is not coprime to coeff_modulus");
-                    }
-                }
             }
 
             // IEEE 754 double-precision float mantissa limit (2^53 = 9007199254740992.0).
@@ -110,7 +97,7 @@ namespace seal
                 ClippedNormalDistribution dist(0, noise_standard_deviation_tilde, noise_max_deviation);
 
                 SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
-                    int64_t noise = std::lround(dist(engine) / static_cast<double>(inverse_scale_factor));
+                    int64_t noise = std::llround(dist(engine) / static_cast<double>(inverse_scale_factor));
                     uint64_t flag = static_cast<uint64_t>(-static_cast<int64_t>(noise < 0));
                     SEAL_ITERATE(
                         iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size,
@@ -120,8 +107,9 @@ namespace seal
             else
             {
                 // High-precision mode: Use 2-Gaussian convolution with exact fixed-point integer scaling.
+                // This mode prevents precision loss for large standard deviations (>= 2^53).
 
-                // Generates a pair of independent standard normal random variables N(0, 1)
+                // Generate a pair of independent standard normal random variables N(0, 1)
                 // using the Box-Muller transform over a 53-bit uniform random bitstream.
                 auto unit_normal_pair = [&]() -> pair<double, double> {
                     uint64_t rand1, rand2;
@@ -133,30 +121,22 @@ namespace seal
                     double u2 = static_cast<double>(rand2 >> 11) * (1.0 / (1ULL << 53));
 
                     double r = sqrt(-2.0 * log(u1));
-                    double t = 2.0 * M_PI * u2;
-                    return { r * cos(t), r * sin(t) };
+                    double theta = 2.0 * M_PI * u2;
+                    return { r * cos(theta), r * sin(theta) };
                 };
 
-                // Converts a double floating-point value y to an exact __int128_t
-                // fixed-point integer scaled by 2^(log_scale + F) without losing mantissa precision.
-                constexpr int F = 50; // Fixed-point fractional bits for 128-bit integer capacity.
+                // Convert a double floating-point value y to an exact __int128_t
+                // fixed-point integer scaled by 2^(log_scale + F).
+                constexpr int F = 50;
                 auto exact_scaled = [F](double y, int log_scale) -> __int128_t {
                     int e;
-                    double fr = frexp(y, &e); // Decompose y = fr * 2^e, where fr in [0.5, 1.0).
-                    int64_t m = static_cast<int64_t>(fr * 9007199254740992.0); // Exact 53-bit integer mantissa.
+                    double fr = frexp(y, &e);
+                    int64_t m = static_cast<int64_t>(fr * 9007199254740992.0); // Exact 53-bit mantissa
 
                     int sh = e - 53 + log_scale + F;
                     __int128_t val = static_cast<__int128_t>(m);
 
-                    if (sh >= 0)
-                    {
-                        return val << sh;
-                    }
-                    else
-                    {
-                        // Return exact 0 on underflow, matching Python logic (m << sh if sh >= 0 else 0).
-                        return 0;
-                    }
+                    return (sh >= 0) ? (val << sh) : 0;
                 };
 
                 __int128_t sigma_128 = static_cast<__int128_t>(noise_standard_deviation_tilde);
@@ -164,7 +144,7 @@ namespace seal
                 SEAL_ITERATE(iter(destination), coeff_count, [&](auto &I) {
                     double y0, y1;
 
-                    // Bulk tail cut: Resample outliers where |y0| > 10.5 (probability ~ 2^-82).
+                    // Bulk tail cut: Resample outliers where |y0| > 10.5.
                     do
                     {
                         auto p = unit_normal_pair();
@@ -172,20 +152,27 @@ namespace seal
                         y1 = p.second;
                     } while (abs(y0) > 10.5);
 
-                    // Compute A = sigma * y0 * 2^F via exact multi-precision integer multiplication.
+                    // Compute primary Gaussian A = sigma * y0 * 2^F.
                     __int128_t A = sigma_128 * exact_scaled(y0, 0);
 
-                    // Compute B = 2^40 * y1 * 2^F (auxiliary dither Gaussian to fill lower bits).
-                    __int128_t B = exact_scaled(y1, 40);
+                    // Compute auxiliary Gaussian B = 2^50 * y1 * 2^F to cover the lower bits.
+                    // A 50-bit shift guarantees continuous precision for sigma up to 2^103.
+                    __int128_t B = exact_scaled(y1, 50);
 
-                    // Exact 128-bit integer addition followed by round-to-nearest right shift.
-                    __int128_t S = (A + B) / static_cast<__int128_t>(inverse_scale_factor);
-                    __int128_t rounded_noise = (S + (static_cast<__int128_t>(1) << (F - 1))) >> F;
+                    // Combine primary and auxiliary Gaussians.
+                    __int128_t S = A + B;
 
-                    // Perform modulo reduction for each RNS prime q_i in the moduli chain.
+                    // Compute total divisor combining scaling factor 2^F and inverse_scale_factor (t).
+                    __int128_t divisor = static_cast<__int128_t>(inverse_scale_factor) << F;
+                    __int128_t half_divisor = divisor >> 1;
+
+                    // Apply exact round-to-nearest division to eliminate C++ integer truncation bias.
+                    __int128_t rounded_noise =
+                        (S >= 0) ? ((S + half_divisor) / divisor) : ((S - half_divisor) / divisor);
+
+                    // Perform modulo reduction for each RNS prime q_i.
                     SEAL_ITERATE(
-                        iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus, t_inv_array), coeff_modulus_size,
-                        [&](auto J) {
+                        iter(StrideIter<uint64_t *>(&I, coeff_count), coeff_modulus), coeff_modulus_size, [&](auto J) {
                             uint64_t q_i = get<1>(J).value();
 
                             // 128-bit modulo reduction with negative result correction.
@@ -405,7 +392,6 @@ namespace seal
                 }
             }
 
-            // Modified by Dice15.
             // Generate e_j <-- chi
             // c[j] = public_key[j] * u + e[j] in BFV/CKKS, = public_key[j] * u + p * e[j] in BGV,
             for (size_t j = 0; j < encrypted_size; j++)
@@ -530,7 +516,6 @@ namespace seal
                 }
             }
 
-            // Modified by Dice15.
             // Sample e <-- chi
             auto noise(allocate_poly(coeff_count, coeff_modulus_size, pool));
             if (are_close(noise_standard_deviations[0], 3.2) && inverse_scale_factors[0] == 1)
