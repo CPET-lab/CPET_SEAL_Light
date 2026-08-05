@@ -1,5 +1,13 @@
 #pragma once
 
+// seal.h includes its headers alphabetically, which puts this file (b) ahead of
+// ciphertext.h/encryptor.h/evaluator.h (c/e) even though the NoiseFlooding class
+// below needs all three as complete types (it inherits from Evaluator and holds
+// an Encryptor&). Including them explicitly first sidesteps that ordering bug --
+// their own #pragma once makes seal.h's later re-include a no-op.
+#include "seal/ciphertext.h"
+#include "seal/encryptor.h"
+#include "seal/evaluator.h"
 #include "seal/util/polyarithsmallmod.h"
 #include <cstdint>
 #include <seal/seal.h>
